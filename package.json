@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "AQ, the Array Query",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/u-44/aq.git"
+  },
   "files": [
     "dist"
   ],
