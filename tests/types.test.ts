@@ -22,7 +22,7 @@ test("Type checks for Query.where with null and undefined", () => {
   // @ts-expect-error invalid operator
   expect(() => query.where("price", "approx", 50)).toThrow();
 
-  // @ts-expect-error like / ilike were removed; use the text operators or a RegExp
+  // @ts-expect-error like / ilike were removed; use the text operators or match / ~
   expect(() => query.where("name", "like", "%a%")).toThrow(TypeError);
 
   // @ts-expect-error invalid value type

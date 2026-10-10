@@ -27,7 +27,7 @@ const result = Query.selectFrom(products)
 - **Type-safe** — keys are checked against your item type, and values are checked against the key's type.
 - **Non-mutating** — the source array is never modified.
 - **SQL-like comparisons** — `=`, `<>`, `<`, `<=`, `>`, `>=`.
-- **Text search** — `contains`, `startsWith`, `endsWith` (and `i`-prefixed case-insensitive variants), or any `RegExp`.
+- **Text search** — `contains`, `startsWith`, `endsWith` (and `i`-prefixed case-insensitive variants), or `match` / `~` with any `RegExp`.
 - **Expression builder** — combine filters with `and`, `or` and `not`, and plug in custom predicates.
 - **Multi-key sorting** — with sensible handling of strings, numbers, booleans, dates and `null`/`undefined`.
 - **Offset & limit** — SQL-style windowing, with early exit when no sorting is needed.
@@ -58,6 +58,7 @@ Query.selectFrom(products).where("price", ">=", 50).where("name", "icontains", "
 | `startsWith`                            | Text starts with the value, case-sensitive.                      |
 | `endsWith`                              | Text ends with the value, case-sensitive.                        |
 | `icontains`, `istartsWith`, `iendsWith` | Same, ignoring case.                                             |
+| `match` / `~`                           | Text matches the `RegExp` value.                                 |
 
 #### Text search
 
@@ -69,11 +70,11 @@ Query.selectFrom(products).where("name", "icontains", search).execute();
 
 #### Regular expressions
 
-Pass a `RegExp` instead of an operator to test the key's text against it, for wildcards, whole-text or case-insensitive equality matches, and anything else the text operators don't cover. Non-string values never match.
+Use `match` (or its alias `~`) with a `RegExp` value to test the key's text against it, for wildcards, whole-text or case-insensitive equality matches, and anything else the text operators don't cover. Non-string values never match.
 
 ```ts
 Query.selectFrom(products)
-  .where("name", /^ap(ple|ricot)$/i)
+  .where("name", "match", /^ap(ple|ricot)$/i)
   .execute();
 ```
 

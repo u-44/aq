@@ -9,14 +9,17 @@ export type Filter<T> = ((item: T) => boolean) & { readonly [filterBrand]: true 
 /**
  * Text operators: the Key's text contains, starts with or ends with the value, taken literally.
  * The `i` prefixed variants ignore case. An empty value matches every string. Non-string values never match.
- * For wildcards or anything fancier, pass a RegExp instead.
+ * For wildcards or anything fancier, use a {@link RegexOperator}.
  */
 export type TextOperator = "contains" | "icontains" | "startsWith" | "istartsWith" | "endsWith" | "iendsWith";
+
+/** Regex operators: the Key's text matches the RegExp value. `~` is an alias of `match`. Non-string values never match. */
+export type RegexOperator = "match" | "~";
 
 /** Operators that compare a Key's value with a value of the same type. */
 export type ComparisonOperator = "=" | "<>" | "<" | "<=" | ">" | ">=";
 
-export type Operator = TextOperator | ComparisonOperator;
+export type Operator = TextOperator | RegexOperator | ComparisonOperator;
 
 /**
  * Builds Filters inside `where(eb => ...)`.
@@ -36,8 +39,8 @@ export interface ExpressionBuilder<T> {
   <K extends keyof T & string>(key: K, op: TextOperator, value: string): Filter<T>;
   /** An equality or range Filter on a Key. */
   <K extends keyof T & string>(key: K, op: ComparisonOperator, value: T[K]): Filter<T>;
-  /** A Filter passing when the Key's text matches the RegExp. Non-string values never match. */
-  <K extends keyof T & string>(key: K, regex: RegExp): Filter<T>;
+  /** A Filter passing when the Key's text matches the RegExp. See {@link RegexOperator}. */
+  <K extends keyof T & string>(key: K, op: RegexOperator, regex: RegExp): Filter<T>;
   /** Passes when every Filter passes. An empty list always passes. */
   and(filters: readonly Filter<T>[]): Filter<T>;
   /** Passes when at least one Filter passes. An empty list never passes. */
@@ -122,7 +125,10 @@ const textFilter = (key: PropertyKey, op: TextOperator, value: unknown): Predica
   }
 };
 
-const regexFilter = (key: PropertyKey, regex: RegExp): Predicate<Row> => {
+const regexFilter = (key: PropertyKey, regex: unknown): Predicate<Row> => {
+  if (!(regex instanceof RegExp)) {
+    throw new TypeError(`Operator requires a RegExp value, got ${regex === null ? "null" : typeof regex}`);
+  }
   // `g` and `y` make test() stateful (lastIndex); drop them so every Item is tested from the start.
   const r = regex.global || regex.sticky ? new RegExp(regex.source, regex.flags.replace(/[gy]/g, "")) : regex;
   return (e) => {
@@ -132,11 +138,10 @@ const regexFilter = (key: PropertyKey, regex: RegExp): Predicate<Row> => {
 };
 
 /** Built-in Filters read Items as Rows; this is the one place an Item is treated as one. */
-const createFilter = (key: PropertyKey, op: Operator | RegExp, value: unknown): Predicate =>
+const createFilter = (key: PropertyKey, op: Operator, value: unknown): Predicate =>
   createRowFilter(key, op, value) as Predicate;
 
-const createRowFilter = (key: PropertyKey, op: Operator | RegExp, value: unknown): Predicate<Row> => {
-  if (op instanceof RegExp) return regexFilter(key, op);
+const createRowFilter = (key: PropertyKey, op: Operator, value: unknown): Predicate<Row> => {
   // Range operators rely on JS relational semantics for whatever the caller passed in.
   const bound = value as Comparable;
   switch (op) {
@@ -171,6 +176,9 @@ const createRowFilter = (key: PropertyKey, op: Operator | RegExp, value: unknown
     case "endsWith":
     case "iendsWith":
       return textFilter(key, op, value);
+    case "match":
+    case "~":
+      return regexFilter(key, value);
     default:
       throw new TypeError(`Unsupported operator: ${String(op)}`);
   }
@@ -181,7 +189,7 @@ const brand = <T>(predicate: Predicate<T>) => predicate as Filter<T>;
 
 /** One shared instance: the builder holds no state, so it serves every Item type. */
 const sharedExpressionBuilder = Object.assign(
-  (key: PropertyKey, op: Operator | RegExp, value?: unknown) => brand(createFilter(key, op, value)),
+  (key: PropertyKey, op: Operator, value: unknown) => brand(createFilter(key, op, value)),
   {
     and: <T>(filters: readonly Filter<T>[]) => brand(and(filters)),
     or: <T>(filters: readonly Filter<T>[]) => brand(or(filters)),
@@ -330,14 +338,15 @@ export class Query<T> {
    */
   where<K extends keyof T & string>(key: K, op: ComparisonOperator, value: T[K]): Query<T>;
   /**
-   * Adds a Filter passing when the Key's text matches the RegExp. Non-string values never match.
+   * Adds a Filter passing when the Key's text matches the RegExp. See {@link RegexOperator}.
    *
    * @example
    * ```typescript
-   * Query.selectFrom(items).where("name", /^ap(ple|ricot)$/i).execute();
+   * Query.selectFrom(items).where("name", "match", /^ap(ple|ricot)$/i).execute();
+   * Query.selectFrom(items).where("name", "~", /^ap/).execute();
    * ```
    */
-  where<K extends keyof T & string>(key: K, regex: RegExp): Query<T>;
+  where<K extends keyof T & string>(key: K, op: RegexOperator, regex: RegExp): Query<T>;
   /**
    * Adds a Filter built with the {@link ExpressionBuilder}, for and / or / not and custom predicates.
    *
@@ -352,7 +361,7 @@ export class Query<T> {
   where(build: (eb: ExpressionBuilder<T>) => Filter<T>): Query<T>;
   where(
     keyOrBuild: (keyof T & string) | ((eb: ExpressionBuilder<T>) => Filter<T>),
-    op?: Operator | RegExp,
+    op?: Operator,
     value?: unknown,
   ): Query<T> {
     let filter: Predicate<T>;
@@ -361,7 +370,7 @@ export class Query<T> {
       if (typeof filter !== "function") {
         throw new TypeError("where(eb => ...) must return a Filter; wrap custom predicates with eb.fn()");
       }
-    } else if (typeof keyOrBuild === "string" && (typeof op === "string" || op instanceof RegExp)) {
+    } else if (typeof keyOrBuild === "string" && typeof op === "string") {
       filter = createFilter(keyOrBuild, op, value);
     } else {
       throw new TypeError("Invalid arguments for Query.where clause");

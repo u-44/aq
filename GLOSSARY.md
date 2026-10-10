@@ -29,7 +29,7 @@ A single test an Item either passes or fails. An Item is in the Result only if i
 _Avoid_: spec, specification, predicate, filterFn, condition
 
 **Operator**:
-A short name (`=`, `<>`, `<`, `<=`, `>`, `>=`, `contains`, `startsWith`, `endsWith`, and `icontains`, `istartsWith`, `iendsWith`) that names a kind of Filter, used together with a Key and a value. A RegExp may take the place of an Operator and value.
+A short name (`=`, `<>`, `<`, `<=`, `>`, `>=`, `contains`, `startsWith`, `endsWith`, and `icontains`, `istartsWith`, `iendsWith`, `match` / `~`) that names a kind of Filter, used together with a Key and a value.
 _Avoid_: comparator, op
 
 **Equality Filter**:
@@ -41,7 +41,7 @@ A Filter that passes when a Key's value is below or above a bound (`<`, `<=`, `>
 _Avoid_: comparison, bound check
 
 **Text Match Filter**:
-A Filter that tests a Key's text value: against a literal value it must contain, start with or end with (`contains`, `startsWith`, `endsWith`; the `i` prefix ignores case), or against a RegExp. Non-text values never pass.
+A Filter that tests a Key's text value: against a literal value it must contain, start with or end with (`contains`, `startsWith`, `endsWith`; the `i` prefix ignores case), or against a RegExp (`match`, alias `~`). Non-text values never pass.
 _Avoid_: string filter, search
 
 **Compound Filter**:

@@ -52,9 +52,9 @@ test("text operators require a string value", () => {
   expect(() => Query.selectFrom(items).where("name", "contains", 1)).toThrow(TypeError);
 });
 
-test("where(key, regex) tests the Key's text", () => {
+test('where(key, "match", regex) tests the Key\'s text', () => {
   const result = Query.selectFrom(items)
-    .where("name", /^apple/i)
+    .where("name", "match", /^apple/i)
     .execute()
     .map((i) => i.name);
   expect(result).toEqual(["apple", "Apple Pie"]);
@@ -62,13 +62,27 @@ test("where(key, regex) tests the Key's text", () => {
 
 test("regex with g or y flags is not stateful across Items", () => {
   const data = [{ name: "apple" }, { name: "apple" }, { name: "apple" }];
-  expect(Query.selectFrom(data).where("name", /apple/g).execute()).toHaveLength(3);
-  expect(Query.selectFrom(data).where("name", /apple/y).execute()).toHaveLength(3);
+  expect(Query.selectFrom(data).where("name", "match", /apple/g).execute()).toHaveLength(3);
+  expect(Query.selectFrom(data).where("name", "~", /apple/y).execute()).toHaveLength(3);
+});
+
+test("~ is an alias of match", () => {
+  const tilde = Query.selectFrom(items).where("name", "~", /pie$/i).execute();
+  const match = Query.selectFrom(items).where("name", "match", /pie$/i).execute();
+  expect(tilde).toEqual(match);
+  expect(tilde.map((i) => i.name)).toEqual(["Apple Pie"]);
+});
+
+test("regex operators require a RegExp value", () => {
+  // @ts-expect-error
+  expect(() => Query.selectFrom(items).where("name", "match", "^apple")).toThrow(TypeError);
+  // @ts-expect-error
+  expect(() => Query.selectFrom(items).where("name", "~", undefined)).toThrow(TypeError);
 });
 
 test("eb accepts text operators and regex", () => {
   const result = Query.selectFrom(items)
-    .where((eb) => eb.or([eb("name", "icontains", "pie"), eb("name", /^\d+%$/)]))
+    .where((eb) => eb.or([eb("name", "icontains", "pie"), eb("name", "~", /^\d+%$/)]))
     .execute()
     .map((i) => i.name);
   expect(result).toEqual(["Apple Pie", "100%"]);
@@ -76,10 +90,13 @@ test("eb accepts text operators and regex", () => {
 
 test("text operator and regex type checks", () => {
   const query = Query.selectFrom([{ name: "a", price: 1 }]);
-  query.where("name", /a/);
+  query.where("name", "match", /a/);
+  query.where("name", "~", /a/);
   query.where("name", "icontains", "a");
   // @ts-expect-error unknown key
-  query.where("unknown", /a/);
-  // @ts-expect-error a regex takes no value
-  query.where("name", /a/, "x");
+  query.where("unknown", "match", /a/);
+  // @ts-expect-error a bare RegExp is no longer accepted; use "match" or "~"
+  expect(() => query.where("name", /a/)).toThrow(TypeError);
+  // @ts-expect-error text operators take a string, not a RegExp
+  expect(() => query.where("name", "contains", /a/)).toThrow(TypeError);
 });
