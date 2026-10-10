@@ -81,8 +81,15 @@ const not =
     !filter(e);
 
 /** Equality: Dates are equal when they denote the same instant. */
-const equals = (a: unknown, b: unknown) =>
-  a instanceof Date && b instanceof Date ? a.getTime() === b.getTime() : a === b;
+const equalityFilter = (key: PropertyKey, value: unknown): Predicate<Row> => {
+  if (value instanceof Date) {
+    return (e) => {
+      const v = e[key];
+      return v instanceof Date && v.getTime() === value.getTime();
+    };
+  }
+  return (e) => e[key] === value;
+};
 
 const assertString: (value: unknown) => asserts value is string = (value) => {
   if (typeof value !== "string") {
@@ -148,9 +155,9 @@ const createRowFilter = (key: PropertyKey, op: Operator, value: unknown): Predic
   const bound = value as Comparable;
   switch (op) {
     case "=":
-      return (e) => equals(e[key], value);
+      return equalityFilter(key, value);
     case "<>":
-      return (e) => !equals(e[key], value);
+      return not(equalityFilter(key, value));
     case "<":
       return (e) => {
         const v = e[key] as Comparable | null | undefined;
