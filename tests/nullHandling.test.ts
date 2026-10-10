@@ -2,20 +2,60 @@ import { expect, test } from "vite-plus/test";
 import { Query } from "../src";
 
 const mixedItems = [
-  { name: "apple", price: 50, stock: 10, active: true, createdAt: new Date("2023-01-01") },
-  { name: null, price: null, stock: 0, active: false, createdAt: new Date("2022-01-01") },
-  { name: "banana", price: 20, stock: undefined, active: true, createdAt: null },
-  { name: undefined, price: 100, stock: 5, active: false, createdAt: new Date("2024-01-01") },
+  {
+    name: "apple",
+    price: 50,
+    stock: 10,
+    active: true,
+    createdAt: new Date("2023-01-01"),
+  },
+  {
+    name: null,
+    price: null,
+    stock: 0,
+    active: false,
+    createdAt: new Date("2022-01-01"),
+  },
+  {
+    name: "banana",
+    price: 20,
+    stock: undefined,
+    active: true,
+    createdAt: null,
+  },
+  {
+    name: undefined,
+    price: 100,
+    stock: 5,
+    active: false,
+    createdAt: new Date("2024-01-01"),
+  },
 ];
 
 test("Query.where with null value using =", () => {
   const result = Query.selectFrom(mixedItems).where("name", "=", null).execute();
-  expect(result).toEqual([{ name: null, price: null, stock: 0, active: false, createdAt: new Date("2022-01-01") }]);
+  expect(result).toEqual([
+    {
+      name: null,
+      price: null,
+      stock: 0,
+      active: false,
+      createdAt: new Date("2022-01-01"),
+    },
+  ]);
 });
 
 test("Query.where with undefined value using =", () => {
   const result = Query.selectFrom(mixedItems).where("name", "=", undefined).execute();
-  expect(result).toEqual([{ name: undefined, price: 100, stock: 5, active: false, createdAt: new Date("2024-01-01") }]);
+  expect(result).toEqual([
+    {
+      name: undefined,
+      price: 100,
+      stock: 5,
+      active: false,
+      createdAt: new Date("2024-01-01"),
+    },
+  ]);
 });
 
 test("Query.where with <> operator and null value", () => {

@@ -47,7 +47,10 @@ bun add @u-44/aq
 Use `where(key, operator, value)`. Successive `where` calls are combined with **AND**.
 
 ```ts
-Query.selectFrom(products).where("price", ">=", 50).where("name", "icontains", "ap").execute();
+Query.selectFrom(products)
+  .where("price", ">=", 50)
+  .where("name", "icontains", "ap")
+  .execute();
 ```
 
 | Operator                                | Meaning                                                          |
@@ -84,7 +87,12 @@ For `or`, `not`, nesting or custom logic, pass a callback to `where`. It receive
 
 ```ts
 Query.selectFrom(products)
-  .where((eb) => eb.or([eb("name", "=", "Banana"), eb.and([eb("price", ">", 100), eb("stock", ">", 0)])]))
+  .where((eb) =>
+    eb.or([
+      eb("name", "=", "Banana"),
+      eb.and([eb("price", ">", 100), eb("stock", ">", 0)]),
+    ]),
+  )
   .where((eb) => eb.not(eb("name", "istartsWith", "cherry")))
   .execute();
 ```
@@ -140,7 +148,11 @@ Query.selectFrom(users)
 `offset(count)` skips the first `count` items of the filtered, sorted result; `limit(count)` keeps at most `count` of what remains. Both take non-negative integers, and a later call replaces an earlier one. Without them, all matching items are returned.
 
 ```ts
-const secondPage = Query.selectFrom(products).orderBy("name").offset(20).limit(20).execute();
+const secondPage = Query.selectFrom(products)
+  .orderBy("name")
+  .offset(20)
+  .limit(20)
+  .execute();
 ```
 
 ### Executing

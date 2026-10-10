@@ -25,5 +25,13 @@ export default defineConfig({
   fmt: {
     experimentalSortPackageJson: true,
     printWidth: 120,
+    overrides: [
+      {
+        files: ["**/*.md"],
+        options: {
+          printWidth: 80,
+        },
+      },
+    ],
   },
 });

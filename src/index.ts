@@ -4,7 +4,9 @@ declare const filterBrand: unique symbol;
  * A single test an Item either passes or fails. Built only through the {@link ExpressionBuilder}
  * passed to `where(eb => ...)`; use `eb.fn` to wrap a custom predicate.
  */
-export type Filter<T> = ((item: T) => boolean) & { readonly [filterBrand]: true };
+export type Filter<T> = ((item: T) => boolean) & {
+  readonly [filterBrand]: true;
+};
 
 /**
  * Text operators: the Key's text contains, starts with or ends with the value, taken literally.
