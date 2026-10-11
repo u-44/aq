@@ -99,38 +99,46 @@ const assertString: (value: unknown) => asserts value is string = (value) => {
 
 const textFilter = (key: PropertyKey, op: TextOperator, value: unknown): Predicate<Row> => {
   assertString(value);
-  const needle = value.toLowerCase();
   switch (op) {
-    case "contains":
+    case "contains": {
       return (e) => {
         const v = e[key];
         return typeof v === "string" && v.includes(value);
       };
-    case "icontains":
+    }
+    case "icontains": {
+      const needle = value.toLowerCase();
       return (e) => {
         const v = e[key];
         return typeof v === "string" && v.toLowerCase().includes(needle);
       };
-    case "startsWith":
+    }
+    case "startsWith": {
       return (e) => {
         const v = e[key];
         return typeof v === "string" && v.startsWith(value);
       };
-    case "istartsWith":
+    }
+    case "istartsWith": {
+      const needle = value.toLowerCase();
       return (e) => {
         const v = e[key];
         return typeof v === "string" && v.toLowerCase().startsWith(needle);
       };
-    case "endsWith":
+    }
+    case "endsWith": {
       return (e) => {
         const v = e[key];
         return typeof v === "string" && v.endsWith(value);
       };
-    case "iendsWith":
+    }
+    case "iendsWith": {
+      const needle = value.toLowerCase();
       return (e) => {
         const v = e[key];
         return typeof v === "string" && v.toLowerCase().endsWith(needle);
       };
+    }
   }
 };
 
