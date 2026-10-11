@@ -11,7 +11,7 @@ An immutable description of what to select from a Source: its Filters, Sort Crit
 _Avoid_: QueryBuilder, statement
 
 **Source**:
-The array of Items a Query selects from. It is never mutated.
+The Items a Query selects from: an array or any other iterable (Set, generator, ...), or a bare iterator. It is never mutated. A one-shot Source is consumed by the first Execution.
 _Avoid_: table, collection, data
 
 **Item**:

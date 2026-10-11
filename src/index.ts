@@ -217,19 +217,18 @@ type Transformers<T> = {
 const textCollator = new Intl.Collator(undefined, { sensitivity: "variant" });
 
 /** Collects up to `limit` matching Items after skipping `offset` of them, stopping as soon as the window is full. */
-const takeWindow = <T>(items: readonly T[], filter: Predicate<T>, offset: number, limit: number): T[] => {
+const takeWindow = <T>(items: Iterable<T>, filter: Predicate<T> | undefined, offset: number, limit: number): T[] => {
   const window: T[] = [];
-  if (limit === 0) return window;
+  if (limit <= 0) return window;
   let skipped = 0;
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    if (!filter(item)) continue;
+  for (const item of items) {
+    if (filter && !filter(item)) continue;
     if (skipped < offset) {
       skipped++;
       continue;
     }
     window.push(item);
-    if (window.length === limit) break;
+    if (window.length >= limit) break;
   }
   return window;
 };
@@ -247,13 +246,22 @@ class NotFoundError extends Error {
   }
 }
 
-type SortCriterion<T> = { key: keyof T; direction: "asc" | "desc" };
+/** Normalises a Source to an Iterable. A bare Iterator becomes a one-shot Iterable over it. */
+const toIterable = <T>(items: Iterable<T> | Iterator<T>): Iterable<T> => {
+  if (Symbol.iterator in items) return items;
+  if ("next" in items && typeof items.next === "function") {
+    return { [Symbol.iterator]: () => items };
+  }
+  throw new TypeError("Query.selectFrom requires an Iterable or an Iterator");
+};
+
+type Ordering<T> = { key: keyof T; direction: "asc" | "desc" };
 
 /** Everything a Query describes. Each builder step copies it with one field changed. */
 type QueryState<T> = {
-  readonly items: T[];
+  readonly items: Iterable<T>;
   readonly filters?: readonly Predicate<T>[];
-  readonly sortCriteria?: readonly SortCriterion<T>[];
+  readonly orderBy?: readonly Ordering<T>[];
   readonly transformers?: Transformers<T>;
   readonly offset: number;
   readonly limit?: number;
@@ -296,17 +304,19 @@ export class Query<T> {
     if (aVal == null) return bVal == null ? 0 : -1;
     if (bVal == null) return 1;
 
-    if (typeof aVal === "string" && typeof bVal === "string") {
-      return textCollator.compare(aVal, bVal);
+    const aType = typeof aVal;
+    const bType = typeof bVal;
+
+    if (aType === "string" && bType === "string") {
+      return textCollator.compare(aVal as string, bVal as string);
     }
-    if (typeof aVal === "number" && typeof bVal === "number") {
+    if (aType === "number" && bType === "number") {
       if (Number.isNaN(aVal)) return Number.isNaN(bVal) ? 0 : 1;
       if (Number.isNaN(bVal)) return -1;
-      return aVal - bVal;
+      return (aVal as number) - (bVal as number);
     }
-    if (typeof aVal === "boolean" && typeof bVal === "boolean") {
-      if (aVal === bVal) return 0;
-      return aVal ? 1 : -1;
+    if (aType === "boolean" && bType === "boolean") {
+      return aVal === bVal ? 0 : aVal ? 1 : -1;
     }
     if (aVal instanceof Date && bVal instanceof Date) {
       return aVal.getTime() - bVal.getTime();
@@ -315,12 +325,18 @@ export class Query<T> {
   }
 
   /**
-   * Creates a new Query instance from an array of items.
-   * @param items The array of objects to query.
+   * Creates a new Query instance from a Source: an array, any other Iterable (Set, Map values,
+   * generator, ...) or a bare Iterator. The Source is never mutated.
+   *
+   * A one-shot Source (a generator or Iterator) is consumed by the first Execution; later
+   * Executions see only what is left of it. Unsorted Executions with a Limit, and
+   * `executeTakeFirst()` without sorting, stop reading the Source early, so they work on infinite ones.
+   *
+   * @param items The objects to query.
    * @returns A new Query instance.
    */
-  static selectFrom<T>(items: T[]): Query<T> {
-    return new Query({ items, offset: 0 });
+  static selectFrom<T>(items: Iterable<T> | Iterator<T>): Query<T> {
+    return new Query({ items: toIterable(items), offset: 0 });
   }
 
   private with(changes: Partial<QueryState<T>>): Query<T> {
@@ -405,8 +421,8 @@ export class Query<T> {
    * @returns A new Query instance with sorting applied.
    */
   orderBy<K extends keyof T>(key: K, direction: "asc" | "desc" = "asc"): Query<T> {
-    const criteria = this.state.sortCriteria ?? [];
-    return this.with({ sortCriteria: [...criteria, { key, direction }] });
+    const ordering = this.state.orderBy ?? [];
+    return this.with({ orderBy: [...ordering, { key, direction }] });
   }
 
   /**
@@ -479,19 +495,15 @@ export class Query<T> {
     const { items, offset, limit } = this.state;
     const filter = this.combinedFilter();
     const comparator = this.buildComparator();
-    const windowed = offset > 0 || limit !== undefined;
-    const end = limit === undefined ? undefined : offset + limit;
 
-    // Unsorted + windowed: stream the Source and stop once the window is full.
-    if (!comparator && windowed) {
-      if (!filter) return items.slice(offset, end);
-      return takeWindow(items, filter, offset, limit ?? Infinity);
-    }
+    // Unsorted: stream, stopping as soon as the window is full (works on infinite Sources).
+    if (!comparator) return takeWindow(items, filter, offset, limit ?? Infinity);
 
-    let result = filter ? items.filter(filter) : [...items];
-    if (comparator) result.sort(comparator);
-    if (windowed) result = result.slice(offset, end);
-    return result;
+    // Sorted: every match must be seen before the window is known. Filter, sort, then slice.
+    const result = filter ? takeWindow(items, filter, 0, Infinity) : Array.from(items);
+    result.sort(comparator);
+    if (offset === 0 && limit === undefined) return result;
+    return result.slice(offset, limit === undefined ? undefined : offset + limit);
   }
 
   private combinedFilter(): Predicate<T> | undefined {
@@ -502,10 +514,10 @@ export class Query<T> {
 
   /** Builds one comparator for all Sort Criteria, or undefined when the Query is unsorted. */
   private buildComparator(): ((a: T, b: T) => number) | undefined {
-    const { sortCriteria: criteria, transformers } = this.state;
-    if (!criteria?.length) return undefined;
-    const keys = criteria.map((c) => c.key);
-    const multipliers = criteria.map((c) => (c.direction === "desc" ? -1 : 1));
+    const { orderBy, transformers } = this.state;
+    if (!orderBy?.length) return undefined;
+    const keys = orderBy.map((c) => c.key);
+    const multipliers = orderBy.map((c) => (c.direction === "desc" ? -1 : 1));
     const n = keys.length;
     return (a, b) => {
       for (let i = 0; i < n; i++) {
@@ -538,20 +550,14 @@ export class Query<T> {
     const filter = this.combinedFilter();
     const comparator = this.buildComparator();
     if (!comparator) {
-      return filter ? items.find(filter) : items.at(0);
+      for (const item of items) if (!filter || filter(item)) return item;
+      return undefined;
     }
 
     // Single pass instead of a full sort. Strict `<` keeps the earliest Item among ties,
     // matching the stable sort used by execute().
-    let found = false;
     let best: T | undefined;
-    for (const item of items) {
-      if (filter && !filter(item)) continue;
-      if (!found || comparator(item, best as T) < 0) {
-        best = item;
-        found = true;
-      }
-    }
+    for (const item of items) if ((!filter || filter(item)) && (!best || comparator(item, best) < 0)) best = item;
     return best;
   }
 

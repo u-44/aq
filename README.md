@@ -25,7 +25,8 @@ const result = Query.selectFrom(products)
 
 - **Fluent & immutable** — every step returns a new `Query`; nothing runs until you execute it. Build a base query once and reuse it.
 - **Type-safe** — keys are checked against your item type, and values are checked against the key's type.
-- **Non-mutating** — the source array is never modified.
+- **Any iterable source** — arrays, `Set`s, `Map.values()`, generators or bare iterators.
+- **Non-mutating** — the source is never modified.
 - **SQL-like comparisons** — `=`, `<>`, `<`, `<=`, `>`, `>=`.
 - **Text search** — `contains`, `startsWith`, `endsWith` (and `i`-prefixed case-insensitive variants), or `match` / `~` with any `RegExp`.
 - **Expression builder** — combine filters with `and`, `or` and `not`, and plug in custom predicates.
@@ -41,6 +42,21 @@ bun add @u-44/aq
 ```
 
 ## Usage
+
+### Sources
+
+`selectFrom` accepts an array or any other iterable (`Set`, `Map.values()`,
+generator, …), or a bare iterator.
+
+```ts
+Query.selectFrom(new Set(products)).where("stock", ">", 0).execute();
+Query.selectFrom(productsById.values()).orderBy("price").executeTakeFirst();
+```
+
+A one-shot source (a generator or iterator) is consumed by the first execution;
+reuse a query only over re-iterable sources such as arrays and `Set`s. Unsorted
+queries with a `limit`, and `executeTakeFirst()` without `orderBy`, stop reading
+early, so they also work on infinite generators.
 
 ### Filtering
 

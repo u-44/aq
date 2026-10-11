@@ -27,7 +27,7 @@ export default defineConfig({
     printWidth: 120,
     overrides: [
       {
-        files: ["**/*.md"],
+        files: ["*.md"],
         options: {
           printWidth: 80,
         },

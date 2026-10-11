@@ -66,3 +66,14 @@ test("Query.executeTakeFirst without sorting returns the first matching Item", (
 test("Query.executeTakeFirst returns undefined with limit(0)", () => {
   expect(Query.selectFrom(items).limit(0).executeTakeFirst()).toBeUndefined();
 });
+
+test("a sorted, filtered window is taken after sorting every match", () => {
+  const items = [5, 4, 3, 2, 1].map((p) => ({ p }));
+  const result = Query.selectFrom(items).where("p", ">", 0).orderBy("p").offset(1).limit(2).execute();
+  expect(result).toEqual([{ p: 2 }, { p: 3 }]);
+});
+
+test("a filtered execution without a limit returns every match", () => {
+  const items = Array.from({ length: 20_000 }, (_, p) => ({ p }));
+  expect(Query.selectFrom(items).where("p", ">=", 0).execute()).toHaveLength(20_000);
+});
