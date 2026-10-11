@@ -64,14 +64,14 @@ type Comparable = string | number | bigint | boolean | Date;
 const and =
   <T>(filters: readonly Predicate<T>[]): Predicate<T> =>
   (e) => {
-    for (let i = 0; i < filters.length; i++) if (!filters[i](e)) return false;
+    for (let i = 0, l = filters.length; i < l; i++) if (!filters[i](e)) return false;
     return true;
   };
 
 const or =
   <T>(filters: readonly Predicate<T>[]): Predicate<T> =>
   (e) => {
-    for (let i = 0; i < filters.length; i++) if (filters[i](e)) return true;
+    for (let i = 0, l = filters.length; i < l; i++) if (filters[i](e)) return true;
     return false;
   };
 
